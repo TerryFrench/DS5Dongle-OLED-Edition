@@ -10,6 +10,9 @@
 #include "hardware/spi.h"
 #include "hardware/gpio.h"
 #include "hardware/watchdog.h"
+#include "hardware/clocks.h"
+#include "hardware/adc.h"
+#include "hardware/vreg.h"
 #include "pico/time.h"
 
 extern uint8_t interrupt_in_data[63]; // defined in main.cpp
@@ -70,10 +73,11 @@ constexpr int kScreenTriggers  = 3;
 constexpr int kScreenGyro      = 4;
 constexpr int kScreenTouchpad  = 5;
 constexpr int kScreenDiag      = 6;
-constexpr int kScreenRssi      = 7;
-constexpr int kScreenVU        = 8;
-constexpr int kScreenSettings  = 9;
-constexpr int kNumScreens      = 10;
+constexpr int kScreenCpu       = 7;
+constexpr int kScreenRssi      = 8;
+constexpr int kScreenVU        = 9;
+constexpr int kScreenSettings  = 10;
+constexpr int kNumScreens      = 11;
 int current_screen = 0;
 
 // Lightbar mode cycle: 0=LIVE, 1-4=FAV0-3, 5=BREATHING, 6=RAINBOW, 7=FADE
@@ -598,6 +602,58 @@ __attribute__((noinline)) void render_screen_diag() {
 
     draw_text(0, 56, "K0=next K1=back");
 
+    flush_fb();
+}
+
+__attribute__((noinline)) void render_screen_cpu() {
+    fb_clear();
+    draw_text(0, 0, "CPU / Clock");
+
+    char buf[24];
+
+    // Configured system clock — compile-time SYS_CLOCK_KHZ, set in main()
+    // via set_sys_clock_khz(). This is the *target*.
+    const uint32_t set_khz = (uint32_t)SYS_CLOCK_KHZ;
+    snprintf(buf, sizeof(buf), "Set : %lu MHz", (unsigned long)(set_khz / 1000u));
+    draw_text(0, 12, buf);
+
+    // Actually running clk_sys, measured live by the on-chip frequency
+    // counter against the crystal reference (not just what we asked for).
+    const uint32_t real_khz = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+    snprintf(buf, sizeof(buf), "Real: %lu.%01lu MHz",
+             (unsigned long)(real_khz / 1000u),
+             (unsigned long)((real_khz % 1000u) / 100u));
+    draw_text(0, 22, buf);
+
+    // Core voltage actually programmed into the regulator, read back (not the
+    // compile-time constant). Codes 0..15 are linear 0.05 V steps from 0.55 V.
+    const int vcode = (int)vreg_get_voltage();
+    if (vcode >= 0 && vcode <= 0b01111) {
+        const unsigned mv = 550u + 50u * (unsigned)vcode;
+        snprintf(buf, sizeof(buf), "Vcore: %u.%02u V", mv / 1000u, (mv % 1000u) / 10u);
+    } else {
+        snprintf(buf, sizeof(buf), "Vcore: code %d", vcode);
+    }
+    draw_text(0, 32, buf);
+
+    // RP2350 on-die temperature sensor (ADC input 4). One-time ADC bring-up;
+    // no other code path uses the ADC, so this is conflict-free.
+    static bool adc_ready = false;
+    if (!adc_ready) {
+        adc_init();
+        adc_set_temp_sensor_enabled(true);
+        adc_ready = true;
+    }
+    adc_select_input(4);
+    const uint16_t raw = adc_read();
+    const float volts = (float)raw * 3.3f / 4096.0f;
+    const float temp_c = 27.0f - (volts - 0.706f) / 0.001721f;
+    const int t10 = (int)(temp_c * 10.0f + (temp_c >= 0 ? 0.5f : -0.5f));
+    snprintf(buf, sizeof(buf), "Temp : %d.%d C", t10 / 10,
+             (t10 < 0 ? -t10 : t10) % 10);
+    draw_text(0, 42, buf);
+
+    draw_text(0, 56, "K0=next K1=back");
     flush_fb();
 }
 
@@ -1212,6 +1268,7 @@ void oled_loop() {
         case kScreenGyro:     render_screen_gyro();      break;
         case kScreenTouchpad: render_screen_touchpad();  break;
         case kScreenDiag:     render_screen_diag();      break;
+        case kScreenCpu:      render_screen_cpu();       break;
         case kScreenRssi:     render_screen_rssi();      break;
         case kScreenVU:       render_screen_vu();        break;
         case kScreenSettings: render_screen_settings();  break;
