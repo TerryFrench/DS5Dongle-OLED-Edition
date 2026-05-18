@@ -585,10 +585,25 @@ uint8_t const desc_hid_report_ds[] = {
     0x09, 0x3A, //   Usage (Vendor 0x3A)
     0x95, 0x3F, //   Report Count (63)
     0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+    // OLED Edition vendor feature reports. These MUST be declared here or
+    // Chrome WebHID rejects receiveFeatureReport() for them (the web config
+    // emulator's slots/diag/cpu reads fail silently otherwise).
+    0x85, 0xFA, //   Report ID (slots, web 0xFA)
+    0x09, 0x3B, //   Usage (Vendor 0x3B)
+    0x95, 0x3F, //   Report Count (63)
+    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+    0x85, 0xFB, //   Report ID (diagnostics, web 0xFB)
+    0x09, 0x3C, //   Usage (Vendor 0x3C)
+    0x95, 0x3F, //   Report Count (63)
+    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+    0x85, 0xFC, //   Report ID (CPU/Clock telemetry, web 0xFC)
+    0x09, 0x3D, //   Usage (Vendor 0x3D)
+    0x95, 0x3F, //   Report Count (63)
+    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
     0xC0, // End Collection
-    // 321 bytes
+    // 345 bytes
 };
-static_assert(sizeof(desc_hid_report_ds) == 0x0141);
+static_assert(sizeof(desc_hid_report_ds) == 0x0159);
 
 uint8_t const desc_hid_report_dse[] = {
     0x05, 0x01, // Usage Page (Generic Desktop Ctrls)
@@ -806,10 +821,23 @@ uint8_t const desc_hid_report_dse[] = {
     0x09, 0x3A, //   Usage (Vendor 0x3A)
     0x95, 0x3F, //   Report Count (63)
     0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+    // OLED Edition vendor feature reports (see desc_hid_report_ds note).
+    0x85, 0xFA, //   Report ID (slots, web 0xFA)
+    0x09, 0x3B, //   Usage (Vendor 0x3B)
+    0x95, 0x3F, //   Report Count (63)
+    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+    0x85, 0xFB, //   Report ID (diagnostics, web 0xFB)
+    0x09, 0x3C, //   Usage (Vendor 0x3C)
+    0x95, 0x3F, //   Report Count (63)
+    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+    0x85, 0xFC, //   Report ID (CPU/Clock telemetry, web 0xFC)
+    0x09, 0x3D, //   Usage (Vendor 0x3D)
+    0x95, 0x3F, //   Report Count (63)
+    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
     0xC0, // End Collection
-    // 437 bytes
+    // 461 bytes
 };
-static_assert(sizeof(desc_hid_report_dse) == 0x01B5);
+static_assert(sizeof(desc_hid_report_dse) == 0x01CD);
 
 // Invoked when received GET HID REPORT DESCRIPTOR
 // Application return pointer to descriptor
