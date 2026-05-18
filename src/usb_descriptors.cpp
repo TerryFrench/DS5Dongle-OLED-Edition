@@ -370,8 +370,12 @@ uint8_t descriptor_configuration[] = {
     0x00, // bCountryCode: Not localized
     0x01, // bNumDescriptors: 1 report descriptor
     0x22, // bDescriptorType: Report
-    0x41, 0x01, // wDescriptorLength: 321 (0x0141) DS
-    // 0xB5, 0x01, // wDescriptorLength: 437 (0x01B5) DSE
+    // MUST equal sizeof(desc_hid_report_ds) (see static_assert below). If
+    // they disagree the host reads a truncated report descriptor and the
+    // HID interface fails to parse — device still enumerates (Device
+    // Manager OK) but WebHID / PlayStation Accessories cannot see it.
+    0x59, 0x01, // wDescriptorLength: 345 (0x0159) DS
+    // 0xCD, 0x01, // wDescriptorLength: 461 (0x01CD) DSE
 
     // Endpoint Descriptor (HID IN: EP4)
     0x07, // bLength
