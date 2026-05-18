@@ -605,7 +605,7 @@ __attribute__((noinline)) void render_screen_diag() {
     flush_fb();
 }
 
-__attribute__((noinline)) void render_screen_cpu() {
+__attribute__((noinline)) void render_screen_cpu(bool entered) {
     fb_clear();
     draw_text(0, 0, "CPU / Clock");
 
@@ -617,9 +617,17 @@ __attribute__((noinline)) void render_screen_cpu() {
     snprintf(buf, sizeof(buf), "Set : %lu MHz", (unsigned long)(set_khz / 1000u));
     draw_text(0, 12, buf);
 
-    // Actually running clk_sys, measured live by the on-chip frequency
-    // counter against the crystal reference (not just what we asked for).
-    const uint32_t real_khz = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+    // Actually running clk_sys, measured by the on-chip frequency counter
+    // against the crystal reference (not just what we asked for). The counter
+    // busy-waits a few ms per call, so measure ONCE on screen entry and cache
+    // it — clk_sys is fixed at boot and never changes, so the temperature
+    // (which legitimately drifts) is the only thing worth refreshing per
+    // frame. cached_real_khz==0 also forces a (re)measure as a safety net.
+    static uint32_t cached_real_khz = 0;
+    if (entered || cached_real_khz == 0) {
+        cached_real_khz = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+    }
+    const uint32_t real_khz = cached_real_khz;
     snprintf(buf, sizeof(buf), "Real: %lu.%01lu MHz",
              (unsigned long)(real_khz / 1000u),
              (unsigned long)((real_khz % 1000u) / 100u));
@@ -1260,6 +1268,13 @@ void oled_loop() {
     const bool idle = (now - last_activity_us) > kAutoDimUs;
     sh1107_set_contrast(idle ? kDimContrast : kBrightLevels[bright_idx]);
 
+    // True on the first render after navigating to a different screen.
+    // Lets a screen do expensive one-shot work on entry (the CPU screen
+    // caches its frequency-counter measurement here).
+    static int last_rendered_screen = -1;
+    const bool screen_entered = (current_screen != last_rendered_screen);
+    last_rendered_screen = current_screen;
+
     switch (current_screen) {
         case kScreenStatus:   render_screen();           break;
         case kScreenSlots:    render_screen_slots();     break;
@@ -1268,7 +1283,7 @@ void oled_loop() {
         case kScreenGyro:     render_screen_gyro();      break;
         case kScreenTouchpad: render_screen_touchpad();  break;
         case kScreenDiag:     render_screen_diag();      break;
-        case kScreenCpu:      render_screen_cpu();       break;
+        case kScreenCpu:      render_screen_cpu(screen_entered); break;
         case kScreenRssi:     render_screen_rssi();      break;
         case kScreenVU:       render_screen_vu();        break;
         case kScreenSettings: render_screen_settings();  break;
