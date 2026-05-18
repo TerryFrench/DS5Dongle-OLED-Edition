@@ -14,6 +14,9 @@
 #include "device/usbd.h"
 #include "pico/time.h"
 #include "slots.h"
+#include "hardware/clocks.h"
+#include "hardware/adc.h"
+#include "hardware/vreg.h"
 
 bool is_pico_cmd(uint8_t report_id) {
     if (report_id == 0xf6 ||
@@ -21,7 +24,8 @@ bool is_pico_cmd(uint8_t report_id) {
         report_id == 0xf8 ||
         report_id == 0xf9 ||
         report_id == 0xfa ||
-        report_id == 0xfb
+        report_id == 0xfb ||
+        report_id == 0xfc
     ) {
         return true;
     }
@@ -91,6 +95,51 @@ uint16_t pico_cmd_get(uint8_t report_id, uint8_t *buffer, uint16_t reqlen) {
         buffer[12] = audio_peak_speaker();
         buffer[13] = audio_peak_haptic();
         memcpy(buffer + 14, &hci_errs,   4);
+        return want;
+    }
+    if (report_id == 0xfc) {
+        // OLED Edition: CPU / Clock telemetry for the web emulator. 11 bytes:
+        //   [0..3]  set_khz  uint32  configured clk_sys (SYS_CLOCK_KHZ)
+        //   [4..7]  real_khz uint32  measured clk_sys (cached, see below)
+        //   [8]     vcode    uint8   vreg_get_voltage() raw enum code
+        //   [9..10] temp_raw uint16  ADC ch4 12-bit reading
+        // The web side does the volts/temperature math (same formulas as
+        // render_screen_cpu) so the firmware HID path stays float-free.
+        constexpr uint16_t want = 11;
+        if (reqlen < want) {
+            printf("[HID] 0xfc reqlen=%u too small for cpu payload (%u)\n", reqlen, want);
+            return 0;
+        }
+        const uint32_t set_khz = (uint32_t)SYS_CLOCK_KHZ;
+
+        // clk_sys is fixed at boot and frequency_count_khz() busy-waits a few
+        // ms — measure exactly once (lazily) and cache. Doing it here on the
+        // first poll keeps it off the boot path; one ~ms stall in a single
+        // GET_REPORT is acceptable.
+        static uint32_t cached_real_khz = 0;
+        if (cached_real_khz == 0) {
+            cached_real_khz = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
+        }
+
+        // One-time ADC bring-up. cmd.cpp and oled.cpp each guard their own
+        // init with a static bool; both run on core0 under the cooperative
+        // main loop (never concurrently), and adc_select_input(4) is set
+        // before every read, so the shared ADC is safe without locking.
+        static bool adc_ready = false;
+        if (!adc_ready) {
+            adc_init();
+            adc_set_temp_sensor_enabled(true);
+            adc_ready = true;
+        }
+        adc_select_input(4);
+        const uint16_t temp_raw = adc_read();
+
+        const uint8_t vcode = (uint8_t)vreg_get_voltage();
+
+        memcpy(buffer + 0, &set_khz,         4);
+        memcpy(buffer + 4, &cached_real_khz, 4);
+        buffer[8] = vcode;
+        memcpy(buffer + 9, &temp_raw,        2);
         return want;
     }
     return 0;
