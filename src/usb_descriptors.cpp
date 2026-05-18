@@ -370,12 +370,8 @@ uint8_t descriptor_configuration[] = {
     0x00, // bCountryCode: Not localized
     0x01, // bNumDescriptors: 1 report descriptor
     0x22, // bDescriptorType: Report
-    // MUST equal sizeof(desc_hid_report_ds) (see static_assert below). If
-    // they disagree the host reads a truncated report descriptor and the
-    // HID interface fails to parse — device still enumerates (Device
-    // Manager OK) but WebHID / PlayStation Accessories cannot see it.
-    0x59, 0x01, // wDescriptorLength: 345 (0x0159) DS
-    // 0xCD, 0x01, // wDescriptorLength: 461 (0x01CD) DSE
+    0x41, 0x01, // wDescriptorLength: 321 (0x0141) DS
+    // 0xB5, 0x01, // wDescriptorLength: 437 (0x01B5) DSE
 
     // Endpoint Descriptor (HID IN: EP4)
     0x07, // bLength
@@ -589,25 +585,10 @@ uint8_t const desc_hid_report_ds[] = {
     0x09, 0x3A, //   Usage (Vendor 0x3A)
     0x95, 0x3F, //   Report Count (63)
     0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-    // OLED Edition vendor feature reports. These MUST be declared here or
-    // Chrome WebHID rejects receiveFeatureReport() for them (the web config
-    // emulator's slots/diag/cpu reads fail silently otherwise).
-    0x85, 0xFA, //   Report ID (slots, web 0xFA)
-    0x09, 0x3B, //   Usage (Vendor 0x3B)
-    0x95, 0x3F, //   Report Count (63)
-    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-    0x85, 0xFB, //   Report ID (diagnostics, web 0xFB)
-    0x09, 0x3C, //   Usage (Vendor 0x3C)
-    0x95, 0x3F, //   Report Count (63)
-    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-    0x85, 0xFC, //   Report ID (CPU/Clock telemetry, web 0xFC)
-    0x09, 0x3D, //   Usage (Vendor 0x3D)
-    0x95, 0x3F, //   Report Count (63)
-    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
     0xC0, // End Collection
-    // 345 bytes
+    // 321 bytes
 };
-static_assert(sizeof(desc_hid_report_ds) == 0x0159);
+static_assert(sizeof(desc_hid_report_ds) == 0x0141);
 
 uint8_t const desc_hid_report_dse[] = {
     0x05, 0x01, // Usage Page (Generic Desktop Ctrls)
@@ -825,23 +806,10 @@ uint8_t const desc_hid_report_dse[] = {
     0x09, 0x3A, //   Usage (Vendor 0x3A)
     0x95, 0x3F, //   Report Count (63)
     0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-    // OLED Edition vendor feature reports (see desc_hid_report_ds note).
-    0x85, 0xFA, //   Report ID (slots, web 0xFA)
-    0x09, 0x3B, //   Usage (Vendor 0x3B)
-    0x95, 0x3F, //   Report Count (63)
-    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-    0x85, 0xFB, //   Report ID (diagnostics, web 0xFB)
-    0x09, 0x3C, //   Usage (Vendor 0x3C)
-    0x95, 0x3F, //   Report Count (63)
-    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-    0x85, 0xFC, //   Report ID (CPU/Clock telemetry, web 0xFC)
-    0x09, 0x3D, //   Usage (Vendor 0x3D)
-    0x95, 0x3F, //   Report Count (63)
-    0xB1, 0x02, //   Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
     0xC0, // End Collection
-    // 461 bytes
+    // 437 bytes
 };
-static_assert(sizeof(desc_hid_report_dse) == 0x01CD);
+static_assert(sizeof(desc_hid_report_dse) == 0x01B5);
 
 // Invoked when received GET HID REPORT DESCRIPTOR
 // Application return pointer to descriptor
