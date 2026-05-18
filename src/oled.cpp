@@ -11,8 +11,8 @@
 #include "hardware/gpio.h"
 #include "hardware/watchdog.h"
 #include "hardware/clocks.h"
-#include "hardware/adc.h"
 #include "hardware/vreg.h"
+#include "cmd.h"
 #include "pico/time.h"
 
 extern uint8_t interrupt_in_data[63]; // defined in main.cpp
@@ -644,16 +644,10 @@ __attribute__((noinline)) void render_screen_cpu(bool entered) {
     }
     draw_text(0, 32, buf);
 
-    // RP2350 on-die temperature sensor (ADC input 4). One-time ADC bring-up;
-    // no other code path uses the ADC, so this is conflict-free.
-    static bool adc_ready = false;
-    if (!adc_ready) {
-        adc_init();
-        adc_set_temp_sensor_enabled(true);
-        adc_ready = true;
-    }
-    adc_select_input(4);
-    const uint16_t raw = adc_read();
+    // RP2350 on-die temperature sensor. Smoothed + averaged in cmd.cpp
+    // (single source of truth shared with the 0xfc web telemetry) so the
+    // reading converges to the true die temp instead of chasing ADC noise.
+    const uint16_t raw = cpu_temp_raw_smoothed();
     const float volts = (float)raw * 3.3f / 4096.0f;
     const float temp_c = 27.0f - (volts - 0.706f) / 0.001721f;
     const int t10 = (int)(temp_c * 10.0f + (temp_c >= 0 ? 0.5f : -0.5f));

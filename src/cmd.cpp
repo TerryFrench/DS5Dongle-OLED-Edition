@@ -18,6 +18,36 @@
 #include "hardware/adc.h"
 #include "hardware/vreg.h"
 
+uint16_t cpu_temp_raw_smoothed() {
+    // One-time ADC bring-up. This is the only place the ADC is initialised
+    // now (oled.cpp's CPU screen calls through here too). Runs on core0
+    // under the cooperative main loop; adc_select_input(4) is set before
+    // every read, so the shared ADC needs no locking.
+    static bool adc_ready = false;
+    if (!adc_ready) {
+        adc_init();
+        adc_set_temp_sensor_enabled(true);
+        adc_ready = true;
+    }
+    adc_select_input(4);
+
+    // The temp sensor has a shallow slope (-1.721 mV/C) and ~1 LSB ≈ 0.47 C,
+    // so a lone 12-bit sample swings several tenths of a degree frame to
+    // frame. Average a big block to kill that...
+    constexpr int kSamples = 256;
+    uint32_t acc = 0;
+    for (int i = 0; i < kSamples; i++) acc += adc_read();
+    const float mean = (float)acc / (float)kSamples;
+
+    // ...then a slow EMA so the displayed value glides to the true die
+    // temperature rather than mirroring the latest block. Seeded on the
+    // first call so it doesn't ramp up from zero.
+    static float ema = -1.0f;
+    if (ema < 0.0f) ema = mean;
+    else            ema += (mean - ema) * 0.15f;
+    return (uint16_t)(ema + 0.5f);
+}
+
 bool is_pico_cmd(uint8_t report_id) {
     if (report_id == 0xf6 ||
         report_id == 0xf7 ||
@@ -121,18 +151,7 @@ uint16_t pico_cmd_get(uint8_t report_id, uint8_t *buffer, uint16_t reqlen) {
             cached_real_khz = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS);
         }
 
-        // One-time ADC bring-up. cmd.cpp and oled.cpp each guard their own
-        // init with a static bool; both run on core0 under the cooperative
-        // main loop (never concurrently), and adc_select_input(4) is set
-        // before every read, so the shared ADC is safe without locking.
-        static bool adc_ready = false;
-        if (!adc_ready) {
-            adc_init();
-            adc_set_temp_sensor_enabled(true);
-            adc_ready = true;
-        }
-        adc_select_input(4);
-        const uint16_t temp_raw = adc_read();
+        const uint16_t temp_raw = cpu_temp_raw_smoothed();
 
         const uint8_t vcode = (uint8_t)vreg_get_voltage();
 
